@@ -14,8 +14,7 @@ class GameServer:
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
         self.server.listen(2)
-        print("🎮 Server started")
-
+        print("🏓 Server started")
         self.clients = {0: None, 1: None}
         self.connected = {0: False, 1: False}
         self.lock = threading.Lock()
@@ -74,35 +73,29 @@ class GameServer:
             with self.lock:
                 self.countdown -= 1
                 self.broadcast_state()
-
         while not self.game_over:
             with self.lock:
                 self.ball['x'] += self.ball['vx']
                 self.ball['y'] += self.ball['vy']
-
                 if self.ball['y'] <= 60 or self.ball['y'] >= HEIGHT:
                     self.ball['vy'] *= -1
                     self.sound_event = "wall_hit"
-
                 if (self.ball['x'] <= 40 and self.paddles[0] <= self.ball['y'] <= self.paddles[0] + 100) or \
                    (self.ball['x'] >= WIDTH - 40 and self.paddles[1] <= self.ball['y'] <= self.paddles[1] + 100):
                     self.ball['vx'] *= -1
                     self.sound_event = 'platform_hit'
-
                 if self.ball['x'] < 0:
                     self.scores[1] += 1
                     self.reset_ball()
                 elif self.ball['x'] > WIDTH:
                     self.scores[0] += 1
                     self.reset_ball()
-
                 if self.scores[0] >= 10:
                     self.game_over = True
                     self.winner = 0
                 elif self.scores[1] >= 10:
                     self.game_over = True
                     self.winner = 1
-
                 self.broadcast_state()
                 self.sound_event = None
             time.sleep(0.016)
@@ -130,13 +123,10 @@ class GameServer:
             self.accept_players()
             self.reset_game_state()
             threading.Thread(target=self.ball_logic, daemon=True).start()
-
             while not self.game_over and all(self.connected.values()):
                 time.sleep(0.1)
-
             print(f"Гравець {self.winner} переміг!")
             time.sleep(5)
-
             # Закриваємо старі з'єднання
             for pid in [0, 1]:
                 try:
