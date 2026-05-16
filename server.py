@@ -10,11 +10,11 @@ PADDLE_SPEED = 10
 COUNTDOWN_START = 3
 
 class GameServer:
-    def __init__(self, host='localhost', port=8080):
+    def __init__(self, host='localhost', port=8081):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
         self.server.listen(2)
-        print("🏓 Server started")
+        print("🎮 Server started")
         self.clients = {0: None, 1: None}
         self.connected = {0: False, 1: False}
         self.lock = threading.Lock()
@@ -92,48 +92,3 @@ class GameServer:
                     self.reset_ball()
                 if self.scores[0] >= 10:
                     self.game_over = True
-                    self.winner = 0
-                elif self.scores[1] >= 10:
-                    self.game_over = True
-                    self.winner = 1
-                self.broadcast_state()
-                self.sound_event = None
-            time.sleep(0.016)
-
-    def reset_ball(self):
-        self.ball = {
-            "x": WIDTH // 2,
-            "y": HEIGHT // 2,
-            "vx": BALL_SPEED * random.choice([-1, 1]),
-            "vy": BALL_SPEED * random.choice([-1, 1])
-        }
-
-    def accept_players(self):
-        for pid in [0, 1]:
-            print(f"Очікуємо гравця {pid}...")
-            conn, _ = self.server.accept()
-            self.clients[pid] = conn
-            conn.sendall((str(pid) + "\n").encode())
-            self.connected[pid] = True
-            print(f"Гравець {pid} приєднався")
-            threading.Thread(target=self.handle_client, args=(pid,), daemon=True).start()
-
-    def run(self):
-        while True:
-            self.accept_players()
-            self.reset_game_state()
-            threading.Thread(target=self.ball_logic, daemon=True).start()
-            while not self.game_over and all(self.connected.values()):
-                time.sleep(0.1)
-            print(f"Гравець {self.winner} переміг!")
-            time.sleep(5)
-            # Закриваємо старі з'єднання
-            for pid in [0, 1]:
-                try:
-                    self.clients[pid].close()
-                except:
-                    pass
-                self.clients[pid] = None
-                self.connected[pid] = False
-
-GameServer().run()
