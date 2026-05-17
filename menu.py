@@ -1,106 +1,156 @@
-from pygame import *
+import pygame
 import sys
 from settings import Settings, settings_loop
 
-# Кольори
-PURPLE = (142, 36, 108)
-ORANGE = (225, 108, 68)
-BLUE = (85, 118, 201)
-WHITE = (255, 255, 255)
-BUTTONS = ["ПОЧАТИ", "НАЛАШТУВАННЯ", "ВИХІД"]
+# ── Palette ──────────────────────────────────────────────────────────────────
+NEON_CYAN   = (0,   255, 240)
+NEON_PINK   = (255,  20, 147)
+NEON_ORANGE = (255, 140,   0)
+DARK_BG     = (6,    4,  20)
+WHITE       = (255, 255, 255)
+DIM_WHITE   = (180, 180, 200)
 
+BUTTONS = [
+    {"label": "ПОЧАТИ",      "accent": NEON_CYAN},
+    {"label": "НАЛАШТУВАННЯ","accent": NEON_PINK},
+    {"label": "ВИХІД",       "accent": NEON_ORANGE},
+]
+
+
+# ── Button ───────────────────────────────────────────────────────────────────
 class Button:
-    def __init__(self, text, font, width, height, pos, round_top=False, round_bottom=False):
-        self.text = text
-        self.font = font
-        self.width = width
-        self.height = height
-        self.pos = pos
-        self.round_top = round_top
-        self.round_bottom = round_bottom
-        self.rect = Rect(pos[0], pos[1], width, height)
+    def __init__(self, data, font_label, rect):
+        self.label  = data["label"]
+        self.accent = data["accent"]
+        self.font_label  = font_label
+        self.rect   = rect
+        self.hover_t = 0.0
 
-    def draw(self, screen, selected=False):
-        if self.text == "ПОЧАТИ":
-            color = ORANGE if selected else PURPLE
-        elif self.text == "НАЛАШТУВАННЯ":
-            color = ORANGE if selected else BLUE
+    def update(self, selected, dt):
+        target = 1.0 if selected else 0.0
+        self.hover_t += (target - self.hover_t) * min(1, dt * 8)
+
+    def draw(self, surf, selected):
+        t = self.hover_t
+        r, g, b = self.accent
+
+        # Simple background
+        bg_col = (int(8 + t * r * 0.08), int(6 + t * g * 0.08), int(22 + t * b * 0.12))
+        pygame.draw.rect(surf, bg_col, self.rect, border_radius=6)
+
+        # Border only when selected
+        if selected:
+            pygame.draw.rect(surf, self.accent, self.rect, width=2, border_radius=6)
         else:
-            color = ORANGE if selected else BLUE
-        border_radius = 20
-        top_left = border_radius if self.round_top else 0
-        top_right = border_radius if self.round_top else 0
-        bottom_left = border_radius if self.round_bottom else 0
-        bottom_right = border_radius if self.round_bottom else 0
-        draw.rect(screen, color, self.rect,
-                  border_top_left_radius=top_left,
-                  border_top_right_radius=top_right,
-                  border_bottom_left_radius=bottom_left,
-                  border_bottom_right_radius=bottom_right)
-        text_surf = self.font.render(self.text, True, WHITE)
-        text_rect = text_surf.get_rect(center=self.rect.center)
-        screen.blit(text_surf, text_rect)
+            pygame.draw.rect(surf, (40, 35, 60), self.rect, width=1, border_radius=6)
 
+        # Label
+        label_col = WHITE if selected else DIM_WHITE
+        label_surf = self.font_label.render(self.label, True, label_col)
+        label_rect = label_surf.get_rect(center=self.rect.center)
+        surf.blit(label_surf, label_rect)
+
+
+# ── Main menu loop ────────────────────────────────────────────────────────────
 def menu_loop(screen_width, screen_height, screen, settings):
-    init()
-    display.set_caption("Меню")
-    clock = time.Clock()
-    mixer.init()
+    pygame.display.set_caption("PING PONG — АРКАДА")
+    clock = pygame.time.Clock()
     play_menu_music(settings)
-    MENU_CHOICE_SOUND = mixer.Sound('sounds/Menu Choice.mp3')
-    font_obj = font.Font(None, 40)
-    button_width = 400
-    button_height = 70
-    gap = 10
-    total_height = len(BUTTONS) * button_height + (len(BUTTONS) - 1) * gap
-    start_y = (screen_height - total_height) // 2
+    pygame.event.clear()
+    pygame.time.wait(80)
+
+    try:
+        choice_snd = pygame.mixer.Sound('sounds/Menu Choice.mp3')
+    except:
+        choice_snd = None
+
+    def load_font(size, bold=False):
+        for name in ["fonts/Orbitron-Bold.ttf", "fonts/orbitron.ttf"]:
+            try:
+                return pygame.font.Font(name, size)
+            except:
+                pass
+        return pygame.font.SysFont("Arial", size, bold=bold)
+
+    font_title  = load_font(64, bold=True)
+    font_btn    = load_font(26, bold=True)
+    font_hint   = load_font(16)
+
+    bw, bh = 420, 68
+    gap = 14
+    total_h = len(BUTTONS) * bh + (len(BUTTONS) - 1) * gap
+    by_start = screen_height // 2 - total_h // 2 + 60
+
     buttons = []
-    for i, text in enumerate(BUTTONS):
-        x = (screen_width - button_width) // 2
-        y = start_y + i * (button_height + gap)
-        round_top = i == 0
-        round_bottom = i == len(BUTTONS) - 1
-        buttons.append(Button(text, font_obj, button_width, button_height, (x, y), round_top, round_bottom))
-    selected_index = 0
+    for i, data in enumerate(BUTTONS):
+        bx = screen_width // 2 - bw // 2
+        by = by_start + i * (bh + gap)
+        buttons.append(Button(data, font_btn, pygame.Rect(bx, by, bw, bh)))
+
+    selected = 0
+
     while True:
-        screen.fill((30, 30, 30))
-        for e in event.get():
-            if e.type == QUIT:
-                quit()
-                sys.exit()
-            if e.type == KEYDOWN:
-                if e.key == K_DOWN:
-                    selected_index = (selected_index + 1) % len(buttons)
-                    MENU_CHOICE_SOUND.play()
-                elif e.key == K_UP:
-                    selected_index = (selected_index - 1) % len(buttons)
-                    MENU_CHOICE_SOUND.play()
-                elif e.key == K_RETURN:
-                    mixer.music.stop()
-                    if buttons[selected_index].text == 'ПОЧАТИ':
+        dt = clock.tick(60) / 1000.0
+
+        # ── Events
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(buttons)
+                    if choice_snd: choice_snd.play()
+                elif e.key == pygame.K_UP:
+                    selected = (selected - 1) % len(buttons)
+                    if choice_snd: choice_snd.play()
+                elif e.key == pygame.K_RETURN:
+                    pygame.mixer.music.stop()
+                    lbl = buttons[selected].label
+                    if lbl == "ПОЧАТИ":
                         return
-                    if buttons[selected_index].text == "ВИХІД":
-                        quit()
-                        sys.exit()
-                    if buttons[selected_index].text == 'НАЛАШТУВАННЯ':
-                        WIDTH, HEIGHT = 800, 600
+                    elif lbl == "ВИХІД":
+                        pygame.quit(); sys.exit()
+                    elif lbl == "НАЛАШТУВАННЯ":
                         play_menu_music(settings)
-                        settings_loop(screen, WIDTH, HEIGHT, settings)
-        for i, button in enumerate(buttons):
-            button.draw(screen, selected=(i == selected_index))
-        display.flip()
-        clock.tick(60)
+                        settings_loop(screen, screen_width, screen_height, settings)
+
+        # ── Draw background (solid dark)
+        screen.fill(DARK_BG)
+
+        # ── Title (centered at top)
+        title = font_title.render("PING  PONG", True, NEON_CYAN)
+        tx = screen_width // 2 - title.get_width() // 2
+        screen.blit(title, (tx, 40))
+
+        # ── Buttons
+        for i, btn in enumerate(buttons):
+            btn.update(i == selected, dt)
+            btn.draw(screen, i == selected)
+
+        # ── Hint
+        hint = font_hint.render("↑ ↓  вибір     ENTER  старт", True, (80, 80, 120))
+        screen.blit(hint, (screen_width // 2 - hint.get_width() // 2,
+                           screen_height - 30))
+
+        pygame.display.flip()
+
 
 def play_menu_music(settings):
     if settings.music_enabled:
-        mixer.music.set_volume(settings.volume)
-        mixer.music.load('sounds/menu.mp3')
-        mixer.music.play(-1)
+        try:
+            pygame.mixer.music.set_volume(settings.volume)
+            pygame.mixer.music.load('sounds/menu.mp3')
+            pygame.mixer.music.play(-1)
+        except:
+            pass
+
 
 def stop_music():
-    mixer.music.stop()
+    pygame.mixer.music.stop()
 
-def start_menu(WIDTH, HEIGHT, screen):
-    settings = Settings()
+
+def start_menu(WIDTH, HEIGHT, screen, settings=None):
+    if settings is None:
+        settings = Settings()
     menu_loop(WIDTH, HEIGHT, screen, settings)
     return settings
